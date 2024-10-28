@@ -1,4 +1,5 @@
 import os
+import time
 import streamlit as st
 from groq import Groq
 import base64
@@ -54,6 +55,33 @@ client = Groq(
     api_key=os.environ.get("GROQ_API_KEY"),
 )
 
+footer="""<style>
+.footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: black;
+    color: white;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+}
+
+.footer p {
+    margin: 0;
+}
+</style>
+
+<div class="footer">
+    <p>Made with ❤ by Aryan</p>
+    <img src='https://groq.com/wp-content/uploads/2024/03/PBG-mark1-color.svg' alt='Powered by Groq for fast inference.' width='50' height='50'/>
+</div>
+"""
+
 if 'photo' not in st.session_state:
     st.session_state['photo'] = 'not done'
     
@@ -62,21 +90,32 @@ def change_photo_state():
 
 
 st.title("Better Notes 📝", anchor=False)
-st.caption("Upload a picture of your notes or take one. One file at a time.")
-
-camera_file = st.camera_input("or take a picture", label_visibility="collapsed", on_change=change_photo_state)
+st.caption("Upload a picture of your notes or take one. One image at a time.")
+st.caption("Try multiple times if the output is not as expected.")
+enable = st.checkbox("Enable camera")
+camera_file = st.camera_input("or take a picture", label_visibility="collapsed", on_change=change_photo_state, disabled=not enable)
 uploaded_file = st.file_uploader("Upload a picture", type=["jpg", "jpeg", "png"], label_visibility="collapsed", on_change=change_photo_state) 
-
 base64_image = None
 
 if uploaded_file is not None:
-    st.image(uploaded_file, caption="Uploaded picture")
+    st.image(uploaded_file, caption="Uploaded picture", width=300)
     base64_image = base64.b64encode(uploaded_file.read()).decode('utf-8')
 if camera_file is not None:
     st.image(camera_file, caption="Camera picture")
     base64_image = base64.b64encode(camera_file.read()).decode('utf-8')
 
 if st.session_state['photo'] == 'done' and base64_image is not None:
+    st.markdown(footer,unsafe_allow_html=True)
+
+    progress_text = "Cooking the notes..."
+    my_bar = st.progress(0, text=progress_text)
+
+    for percent_complete in range(100):
+        time.sleep(0.03)
+        my_bar.progress(percent_complete + 1, text=progress_text)
+    time.sleep(1)
+    my_bar.empty()
+    
     completion = client.chat.completions.create(
         model="llama-3.2-90b-vision-preview",
         messages=[
@@ -85,21 +124,19 @@ if st.session_state['photo'] == 'done' and base64_image is not None:
                     "content": [
                         {
                             "type": "text",
-                            "text": '''Explain the note and write as a new note in a way an A student would take notes.
-                                Requirements:
-                                1. Output in markdown format.
-                                2. Make it enjoyable and introduce a simple game to learn it better Ex. Quick quiz, Memory game, Practice problem, Fill-in-the-blanks exercise, etc. 
-                                3. Have a seperate section for explaining it in laymen's term as well as any word that may be confusing for a student. 
-                                4. Don't say anything additional after you are done with the notes. 
-                                5. Keep it clean and simple. 
-                                6. Use emojis if appropriate.
-                                7. If you need to output math use latex in markdown to output equations
-                                8. If you need to output code use code format in markdown.
-                                9. Try using a table in markdown format whenever possible to visualize data better.
-                                10. Make sure not to miss anything in the given notes picture.
-                                11. Decline to output if the picture is not related to studies.
-                                12. Don't Output/Show code if it is not related to the notes.
-                                13. Keep a Remember section for the most important points.'''
+                            "text": '''Rewrite the given note into a detailed and well-structured format as if prepared by an A-grade student.
+                            Requirements:
+                            - Output format: Use markdown, keeping sections organized and easy to read.
+                            - Simple Explanation: Add a section that explains complex terms and concepts in simple, everyday language.
+                            - Explaination for more stupid brains: Explain like the way you would explain to a 5 year old.
+                            - Clean Presentation: Use clear and concise language, avoid unnecessary text at the end, and introduce emojis on titles.
+                            - Formatting:
+                                - Use LaTeX in markdown for math equations.
+                                - Format code sections in markdown if they are directly relevant to the note.
+                                - Use tables to present data visually if it improves clarity.
+                            - Completeness: Make sure all essential points from the original note are covered without adding unrelated information. Don't write anything else after finishing the note.
+                            - Extra Information: Include additional relevant information that could help a student understand the topic better.
+                            - Summary Section: Include a 'Remember' section that highlights key takeaways or important points for easy review.''',
                         },
                         {
                             "type": "image_url",
@@ -114,26 +151,33 @@ if st.session_state['photo'] == 'done' and base64_image is not None:
                     "content": ""
                 }
             ],
-            temperature=0.4,
+            temperature=0.3,
             max_tokens=3072,
             top_p=1,
             stream=False,
             stop=None,
         )
-
-    st.markdown(completion.choices[0].message.content)
     
+    st.markdown(completion.choices[0].message.content)    
     markdown_text = completion.choices[0].message.content   
 
     html_text = convert_markdown_to_html(markdown_text)
     output = convert_html_to_pdf(html_text)
     
+
     st.download_button(
         label="Download",
         data=output,
         file_name="output.pdf",
         mime="application/pdf",
     )
-    st.caption("Download is still under Alpha. May not work as expected.")
     
+    st.caption("Download is still under Alpha. May not work as expected.")
+    st.session_state['markdown_text'] = completion.choices[0].message.content
     st.session_state['photo'] = 'not done'
+
+elif 'markdown_text' in st.session_state:
+    st.markdown(st.session_state['markdown_text'])
+    st.markdown(footer,unsafe_allow_html=True)
+
+
