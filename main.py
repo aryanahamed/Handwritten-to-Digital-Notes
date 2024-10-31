@@ -18,6 +18,44 @@ client = Groq(
 
 url = "https://md-to-pdf.fly.dev"
 
+css = '''
+h1, h2 {
+  	font-family:georgia, serif;
+	color:#381704;
+	font-size:24px;
+	letter-spacing:0.1em;
+	line-height:150%;
+	padding-top:5px;
+}
+p {
+  	font-family:georgia,serif;
+	color:#381704;
+	font-size:16px;
+	font-weight:normal;
+	line-height:150%;
+	padding:0px;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0 auto;
+}
+th, td {
+	border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+}
+th {
+    background-color: #282a35;
+    font-size: 18px;
+	color:#fff;
+	font-weight: bold;
+}
+td {
+	font-size: 16px;
+}
+'''
+
 
 footer="""<style>
 .footer {
@@ -45,6 +83,11 @@ footer="""<style>
     <img src='https://groq.com/wp-content/uploads/2024/03/PBG-mark1-color.svg' alt='Powered by Groq for fast inference.' width='50' height='50'/>
 </div>
 """
+
+def stream_data(markdown_text):
+    for word in markdown_text.split(" "):
+        yield word + " "
+        time.sleep(0.05)
 
 if 'photo' not in st.session_state:
     st.session_state['photo'] = 'not done'
@@ -118,26 +161,29 @@ if st.session_state['photo'] == 'done' and base64_image is not None:
             ],
             temperature=0.3,
             max_tokens=3072,
-            top_p=1,
+            top_p=0.95,
             stream=False,
             stop=None,
         )
     
-    st.markdown(completion.choices[0].message.content)
+    # st.markdown(completion.choices[0].message.content)
     markdown_text = completion.choices[0].message.content
+    st.write_stream(stream_data(markdown_text))
 
     response = requests.post(url, data={"markdown": markdown_text, "engine": "pdflatex"})
     output = response.content
+    
     if response.status_code != 200:
-        st.error("Error in converting markdown to pdf. Text contain unsupported unicode characters.")
-    else:
-        st.download_button(
-            label="Download",
-            data=output,
-            file_name="output.pdf",
-            mime="application/pdf",
-        )
-
+        response = requests.post(url, data={"markdown": markdown_text, "engine": "wkhtmltopdf", "css": css})
+        output = response.content
+    
+    st.download_button(
+        label="Download",
+        data=output,
+        file_name="output.pdf",
+        mime="application/pdf",
+    )
+    
     st.session_state['markdown_text'] = completion.choices[0].message.content
     st.session_state['output'] = output
     st.session_state['photo'] = 'not done'
@@ -147,12 +193,12 @@ elif 'markdown_text' in st.session_state:
     response = requests.post(url, data={"markdown": st.session_state['markdown_text'], "engine": "pdflatex"})
     output = response.content
     if response.status_code != 200:
-        st.error("Error in converting markdown to pdf. Text contain unsupported unicode characters.")
-    else:
-        st.download_button(
-            label="Download",
-            data=output,
-            file_name="output.pdf",
-            mime="application/pdf",
-        )
+        response = requests.post(url, data={"markdown": st.session_state['markdown_text'], "engine": "wkhtmltopdf", "css": css})
+        output = response.content
+    st.download_button(
+        label="Download",
+        data=output,
+        file_name="output.pdf",
+        mime="application/pdf",
+    )
     st.markdown(footer, unsafe_allow_html=True)
