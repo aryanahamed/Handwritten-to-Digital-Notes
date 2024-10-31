@@ -2,3 +2,4 @@ streamlit
 groq
 markdown
 xhtml2pdf
+python-dotenv
