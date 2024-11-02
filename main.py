@@ -138,17 +138,22 @@ if prompt_choice == "Rewrite in a :rainbow[better] way":
                             - Use LaTeX in markdown for math equations.
                             - Format code sections in markdown if they are directly relevant to the note.
                             - Use tables to present data visually if it improves clarity.
-                            - Explain like the way you would explain to a 5 year old.
+                            - Have a seperate section where you Explain like the way you would explain to a 5 year old.
                             - Include additional relevant information that could help a student understand the topic better.
                             - Include a 'Remember' section that highlights key takeaways or important points for easy review.'''
 elif prompt_choice == "Explain all the :red[***complex***] terms":
-    prompt = '''I want you to act as a teacher who explains complex terms and only complex terms in laymen terms but still keeping the technical accuracy.
-                            Requirements: 
-                            - Do not write any unncesessary text like "I hope you understand blablabla" at the end.
+    prompt = '''Provide definitions as you would explain a university-level student who is familiar with fundamental concepts but seeks a deeper understanding. 
+                            Requirements:
+                            - Explain in laymen terms but still keeping the technical accuracy. Avoid the easy terms and focus on the hard ones.
+                            - Explain pre-requisite subterms within subterms before explaining the main term. 
+                            - Write in a tabular format with the complex term on the left and the layman term on the right.
+                            - There should be 2 tables: one for required pre-requisite terms and the other for the main terms.
+                            - Do not write any unncesessary text like at the end.
                             - Do not use any unicode characters that doesn't support latex to pdf conversion like emojis.
                             - Use markdown, keeping sections organized and easy to read.
-                            - Explain pre-requisite subterms within subterms before explaining the main term. 
-                                Example: If you have to explain "Regression", you should explain "Correlation, linearity, multivariable, etc" first.'''
+                            - Make sure to include all the complex terms in the note.
+                            - Do not copy the original note in the response.
+                            '''
 else:
     prompt = '''Imagine you are in a fairy tale or a hilarious movie of complexity. Explain complex terms and concepts in more complex terms that is extreamly hard to understand.
                             Requirements: 
