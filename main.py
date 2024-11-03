@@ -9,8 +9,17 @@ import requests
 
 load_dotenv()
 
+st.title("Better Notes 📝", anchor=False)
+st.caption("Upload a picture of your notes or take one. Choosing the wrong type will result in bad output.")
+user_api_key = st.text_input("Enter your API Key (leave blank to use default and please don't abuse)", type="password")
+if user_api_key:
+    api_key = user_api_key
+
+else:
+    api_key = os.environ.get("GROQ_API_KEY")
+
 client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY"),
+    api_key=api_key,
 )
 
 url = "https://md-to-pdf.fly.dev"
@@ -96,12 +105,10 @@ def reset_submission():
 def change_photo_state():
     st.session_state['photo'] = 'done'
 
-
-st.title("Better Notes 📝", anchor=False)
-st.caption("Upload a picture of your notes or take one. One image at a time.")
-st.caption("Try multiple times if the output is not as expected.")
+camera_file = None
 enable = st.checkbox("Enable camera")
-camera_file = st.camera_input("or take a picture", label_visibility="collapsed", on_change=change_photo_state, disabled=not enable)
+if enable:
+    camera_file = st.camera_input("Take a picture", label_visibility="collapsed", on_change=change_photo_state, disabled=not enable)
 uploaded_file = st.file_uploader("Upload a picture", type=["jpg", "jpeg", "png"], label_visibility="collapsed", on_change=change_photo_state) 
 base64_image = None
 
@@ -219,7 +226,10 @@ if submit or st.session_state.get('submitted_once', False):
                 stream=False,
                 stop=None,
             )
-        
+        if user_api_key:
+            st.info("Using user-provided API key.")
+        else:
+            st.info("Using default system API key.")
         markdown_text = completion.choices[0].message.content
         st.write_stream(stream_data(markdown_text))
 
