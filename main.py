@@ -60,6 +60,9 @@ th {
 td {
 	font-size: 16px;
 }
+tr {
+    border-bottom: 1px solid black;
+}
 '''
 
 
@@ -148,17 +151,15 @@ if prompt_choice == "Rewrite in a :rainbow[better] way":
                             - Include additional relevant information that could help a student understand the topic better.
                             - Include a 'Remember' section that highlights key takeaways or important points for easy review.'''
 elif prompt_choice == "Explain all the :red[***complex***] terms":
-    prompt = '''Provide definitions as you would explain a university-level student who is familiar with fundamental concepts but seeks a deeper understanding. 
+    prompt = '''Provide definitions for complex terms as you would explain to a university-level student familiar with fundamental concepts but seeking a deeper understanding.
                             Requirements:
-                            - Explain in laymen terms but still keeping the technical accuracy. Avoid the easy terms and focus on the hard ones.
-                            - Explain pre-requisite subterms within subterms before explaining the main term. 
-                            - Write in a tabular format with the complex term on the left and the layman term on the right.
-                            - There should be 2 tables: one for required pre-requisite terms and the other for the main terms.
-                            - Do not write any unncesessary text like at the end.
-                            - Do not use any unicode characters that doesn't support latex to pdf conversion like emojis.
-                            - Use markdown, keeping sections organized and easy to read.
-                            - Make sure to include all the complex terms in the note.
-                            - Do not copy the original note in the response.
+                            - Table for prerequisite terms (only unique terms required to understand the main terms).
+                            - Table for main terms.
+                            - Explain using layman's terms while keeping technical accuracy. Prioritize explaining harder terms, especially any that are prerequisites.
+                            - Structure the response in markdown with two organized tables:
+                                - Limit each definition to 1-2 concise sentences, avoiding redundancy across tables.
+                                - Keep it technical yet straightforward—avoid oversimplification and any unnecessary text.
+                            - Avoid unsupported characters like emojis for LaTeX-PDF compatibility.
                             '''
 elif prompt_choice == "I am feeling :green[freaky] :alien:":
     prompt = '''Imagine you are in a fairy tale or a hilarious movie of complexity. Explain complex terms and concepts in more complex terms that is extreamly hard to understand.
@@ -187,45 +188,36 @@ if submit or st.session_state.get('submitted_once', False):
     
     if st.session_state['photo'] == 'done' and base64_image is not None:
         st.markdown(footer,unsafe_allow_html=True)
-
-        progress_text = "Cooking the notes... 🍳"
-        my_bar = st.progress(0, text=progress_text)
-
-        for percent_complete in range(100):
-            time.sleep(0.02)
-            my_bar.progress(percent_complete + 1, text=progress_text)
-        time.sleep(1)
-        my_bar.empty()
-        
-        completion = client.chat.completions.create(
-            model="llama-3.2-90b-vision-preview",
-            messages=[
-                {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": prompt,
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}",
-                                }
-                            },
-                        ]
-                    },
+        with st.spinner("Cooking the notes... 🍳"):
+            completion = client.chat.completions.create(
+                model="llama-3.2-90b-vision-preview",
+                messages=[
                     {
-                        "role": "assistant",
-                        "content": ""
-                    }
-                ],
-                temperature=1,
-                max_tokens=3072,
-                top_p=0.95,
-                stream=False,
-                stop=None,
-            )
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": prompt,
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}",
+                                    }
+                                },
+                            ]
+                        },
+                        {
+                            "role": "assistant",
+                            "content": ""
+                        }
+                    ],
+                    temperature=1,
+                    max_tokens=3072,
+                    top_p=0.95,
+                    stream=False,
+                    stop=None,
+                )
         if user_api_key:
             st.info("Using user-provided API key.")
         else:
