@@ -3,9 +3,6 @@ import time
 import streamlit as st
 from groq import Groq
 import base64
-import markdown
-from xhtml2pdf import pisa
-from io import BytesIO
 from dotenv import load_dotenv
 import requests
 
@@ -94,6 +91,7 @@ if 'photo' not in st.session_state:
     
 def reset_submission():
     st.session_state['submitted_once'] = False
+    st.session_state['photo'] = 'done'
 
 def change_photo_state():
     st.session_state['photo'] = 'done'
@@ -116,11 +114,12 @@ if camera_file is not None:
 
 prompt_choice = st.radio(
     "Choose a type of note",
-    ["Rewrite in a :rainbow[better] way", "Explain all the :red[***complex***] terms" , "I am feeling :green[freaky] :alien: "],
+    ["Rewrite in a :rainbow[better] way", "Explain all the :red[***complex***] terms" , "I am feeling :green[freaky] :alien:", "Solve :blue[questions] :pencil:"],
     captions=[
         "Note is too boring? Let's make it interesting!",
         "Understand the complex terms and concepts.",
-        "Let's see what happens.",
+        "Only for big brains.",
+        "Get a solution to the questions."
     ],
     on_change=reset_submission
 )
@@ -154,7 +153,7 @@ elif prompt_choice == "Explain all the :red[***complex***] terms":
                             - Make sure to include all the complex terms in the note.
                             - Do not copy the original note in the response.
                             '''
-else:
+elif prompt_choice == "I am feeling :green[freaky] :alien:":
     prompt = '''Imagine you are in a fairy tale or a hilarious movie of complexity. Explain complex terms and concepts in more complex terms that is extreamly hard to understand.
                             Requirements: 
                             - Fill the text with full of emojis.
@@ -164,13 +163,22 @@ else:
                             - Do not let the user know that you are intentionally making the note hard to understand.
                             - Do not use any title like 'Excuse', 'Note', 'Made up Fact
                             - Keep your response short and funny'''
+else:
+    prompt = '''Provide a detailed solution to the questions.
+                            Requirements:
+                            - Divide the questions into parts and solve each part separately.
+                            - Do not write any unncesessary text like at the end.
+                            - Do not use any unicode characters that doesn't support latex to pdf conversion like emojis.
+                            - Use markdown, keeping sections organized and easy to read.
+                            - Keep the solution clear and concise.
+                            - Keep explainations simple and easy to understand.'''
 
     
 submit = st.button("Cook the notes")
 if submit or st.session_state.get('submitted_once', False):
     st.session_state['submitted_once'] = True
     
-    if st.session_state['photo'] == 'done' and base64_image is not None and submit:
+    if st.session_state['photo'] == 'done' and base64_image is not None:
         st.markdown(footer,unsafe_allow_html=True)
 
         progress_text = "Cooking the notes... 🍳"
@@ -222,7 +230,6 @@ if submit or st.session_state.get('submitted_once', False):
             response = requests.post(url, data={"markdown": markdown_text, "engine": "wkhtmltopdf", "css": css})
             output = response.content
         
-        st.subheader("Please upload the image again to use a different note output.", anchor=False)
         st.download_button(
             label="Download",
             data=output,
@@ -234,6 +241,7 @@ if submit or st.session_state.get('submitted_once', False):
         st.session_state['output'] = output
         st.session_state['photo'] = 'not done'
         st.session_state['submitted_once'] = False
+        base64_image = None
         
     elif base64_image is None:
         st.session_state['markdown_text'] = None
@@ -254,6 +262,5 @@ if submit or st.session_state.get('submitted_once', False):
             mime="application/pdf",
         )
         st.markdown(footer, unsafe_allow_html=True)
-        if st.session_state.get('photo') == 'not done':
-            st.session_state['submitted_once'] = False
+        st.session_state['submitted_once'] = False
         
