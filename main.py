@@ -164,9 +164,9 @@ elif prompt_choice == "I am feeling :green[freaky] :alien:":
                             - Do not use any title like 'Excuse', 'Note', 'Made up Fact
                             - Keep your response short and funny'''
 else:
-    prompt = '''Provide a detailed solution to the questions.
+    prompt = '''Provide a detailed solution to the questions/Exercises.
                             Requirements:
-                            - Divide the questions into parts and solve each part separately.
+                            - Divide the questions/exercises into parts and solve each part separately.
                             - Do not write any unncesessary text like at the end.
                             - Do not use any unicode characters that doesn't support latex to pdf conversion like emojis.
                             - Use markdown, keeping sections organized and easy to read.
@@ -213,7 +213,7 @@ if submit or st.session_state.get('submitted_once', False):
                         "content": ""
                     }
                 ],
-                temperature=0.3,
+                temperature=1,
                 max_tokens=3072,
                 top_p=0.95,
                 stream=False,
