@@ -1,26 +1,58 @@
 import os
 import time
 import streamlit as st
-from groq import Groq
-import base64
 from dotenv import load_dotenv
 import requests
-
+import google.generativeai as genai
+import tempfile
+import mimetypes
+import random
 
 load_dotenv()
 
 st.title("Better Notes 📝", anchor=False)
 st.caption("Upload a picture of your notes or take one. Choosing the wrong type will result in bad output.")
-user_api_key = st.text_input("Enter your API Key (leave blank to use default and please don't abuse)", type="password")
+user_api_key = st.text_input("Enter your Gemini API Key (leave blank to use default and please don't abuse)", type="password")
+
+gemini_api_key = None
 if user_api_key:
-    api_key = user_api_key
-
+    gemini_api_key = user_api_key
 else:
-    api_key = os.environ.get("GROQ_API_KEY")
+    gemini_api_key = os.environ.get("GEMINI_API_KEY")
 
-client = Groq(
-    api_key=api_key,
+if gemini_api_key:
+    genai.configure(api_key=gemini_api_key)
+else:
+    st.error("Gemini API Key not found. Please provide one or set the GEMINI_API_KEY environment variable.")
+    st.stop()
+
+generation_config = {
+    "temperature": 1,
+    "top_p": 0.95,
+    "top_k": 64,
+    "max_output_tokens": 65536,
+    "response_mime_type": "text/plain",
+}
+
+model = genai.GenerativeModel(
+    model_name="gemini-2.5-flash-preview-04-17",
+    generation_config=generation_config,
 )
+
+spinner_messages = [
+    "Cooking the notes... 🍳",
+    "Brewing some knowledge... ☕",
+    "Whipping up insights... 🥣",
+    "Simmering the details... 🔥",
+    "Grilling the concepts... ♨️",
+    "Baking understanding... 🍞",
+    "Mixing the main points... 🥄",
+    "Seasoning the summary...🧂",
+    "Decoding the scribbles... 🕵️",
+    "Translating the hieroglyphs... 📜",
+    "Assembling the ideas... 🧩",
+    "Polishing the text... ✨",
+]
 
 url = "https://md-to-pdf.fly.dev"
 
@@ -65,7 +97,6 @@ tr {
 }
 '''
 
-
 footer="""<style>
 .footer {
     position: fixed;
@@ -89,7 +120,6 @@ footer="""<style>
 
 <div class="footer">
     <p>Made with ❤ by Aryan</p>
-    <img src='https://groq.com/wp-content/uploads/2024/03/PBG-mark1-color.svg' alt='Powered by Groq for fast inference.' width='50' height='50'/>
 </div>
 """
 
@@ -112,15 +142,18 @@ camera_file = None
 enable = st.checkbox("Enable camera")
 if enable:
     camera_file = st.camera_input("Take a picture", label_visibility="collapsed", on_change=change_photo_state, disabled=not enable)
-uploaded_file = st.file_uploader("Upload a picture", type=["jpg", "jpeg", "png"], label_visibility="collapsed", on_change=change_photo_state) 
-base64_image = None
+uploaded_file = st.file_uploader("Upload a picture", type=["jpg", "jpeg", "png", "pdf"], label_visibility="collapsed", on_change=change_photo_state)
+image_bytes = None
+mime_type = None
 
 if uploaded_file is not None:
     st.image(uploaded_file, caption="Uploaded picture", width=300)
-    base64_image = base64.b64encode(uploaded_file.read()).decode('utf-8')
+    image_bytes = uploaded_file.getvalue()
+    mime_type = uploaded_file.type
 if camera_file is not None:
     st.image(camera_file, caption="Camera picture")
-    base64_image = base64.b64encode(camera_file.read()).decode('utf-8')
+    image_bytes = camera_file.getvalue()
+    mime_type = camera_file.type
 
 prompt_choice = st.radio(
     "Choose a type of note",
@@ -133,7 +166,6 @@ prompt_choice = st.radio(
     ],
     on_change=reset_submission
 )
-
 
 if prompt_choice == "Rewrite in a :rainbow[better] way":
     prompt = '''Rewrite the given note into a detailed and well-structured format as if prepared by an A-grade student.
@@ -163,7 +195,7 @@ elif prompt_choice == "Explain all the :red[***complex***] terms":
                             '''
 elif prompt_choice == "I am feeling :green[freaky] :alien:":
     prompt = '''Imagine you are in a fairy tale or a hilarious movie of complexity. Explain complex terms and concepts in more complex terms that is extreamly hard to understand.
-                            Requirements: 
+                            Requirements:
                             - Fill the text with full of emojis.
                             - Use markdown.
                             - Always come up with an excuse and make up stuff that is funny but does not make any sense.
@@ -181,88 +213,87 @@ else:
                             - Keep the solution clear and concise.
                             - Keep explainations simple and easy to understand.'''
 
-    
 submit = st.button("Cook the notes")
 if submit or st.session_state.get('submitted_once', False):
     st.session_state['submitted_once'] = True
-    
-    if st.session_state['photo'] == 'done' and base64_image is not None:
-        st.markdown(footer,unsafe_allow_html=True)
-        with st.spinner("Cooking the notes... 🍳"):
-            completion = client.chat.completions.create(
-                model="llama-3.2-90b-vision-preview",
-                messages=[
-                    {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": prompt,
-                                },
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}",
-                                    }
-                                },
-                            ]
-                        },
-                        {
-                            "role": "assistant",
-                            "content": ""
-                        }
-                    ],
-                    temperature=1,
-                    max_tokens=3072,
-                    top_p=0.95,
-                    stream=False,
-                    stop=None,
-                )
-        if user_api_key:
-            st.info("Using user-provided API key.")
-        else:
-            st.info("Using default system API key.")
-        markdown_text = completion.choices[0].message.content
-        st.write_stream(stream_data(markdown_text))
 
-        response = requests.post(url, data={"markdown": markdown_text, "engine": "pdflatex"})
-        output = response.content
-        
-        if response.status_code != 200:
-            response = requests.post(url, data={"markdown": markdown_text, "engine": "wkhtmltopdf", "css": css})
-            output = response.content
-        
+    if st.session_state['photo'] == 'done' and image_bytes is not None:
+        st.markdown(footer,unsafe_allow_html=True)
+        random_message = random.choice(spinner_messages)
+        with st.spinner(random_message):
+            uploaded_file_obj = None
+            temp_file_path = None
+            try:
+                suffix = mimetypes.guess_extension(mime_type) or '.tmp'
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+                    temp_file.write(image_bytes)
+                    temp_file_path = temp_file.name
+
+                uploaded_file_obj = genai.upload_file(path=temp_file_path, mime_type=mime_type)
+
+                response = model.generate_content([prompt, uploaded_file_obj], stream=False)
+                response.resolve()
+                markdown_text = response.text
+
+            except Exception as e:
+                st.error(f"An error occurred with the Gemini API: {e}")
+                markdown_text = "Error generating response."
+            finally:
+                if uploaded_file_obj:
+                    try:
+                       genai.delete_file(uploaded_file_obj.name)
+                    except Exception as e:
+                       print(f"Error deleting file {uploaded_file_obj.name}: {e}")
+
+                if temp_file_path and os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+
+        if user_api_key:
+            st.info("Using user-provided Gemini API key.")
+        else:
+            st.info("Using default system Gemini API key.")
+
+        st.markdown(markdown_text)
+
+        pdf_response = requests.post(url, data={"markdown": markdown_text, "engine": "pdflatex"})
+        output = pdf_response.content
+
+        if pdf_response.status_code != 200:
+            pdf_response = requests.post(url, data={"markdown": markdown_text, "engine": "wkhtmltopdf", "css": css})
+            output = pdf_response.content
+
         st.download_button(
-            label="Download",
+            label="Download PDF",
             data=output,
             file_name="output.pdf",
             mime="application/pdf",
         )
-        
-        st.session_state['markdown_text'] = completion.choices[0].message.content
+
+        st.session_state['markdown_text'] = markdown_text
         st.session_state['output'] = output
         st.session_state['photo'] = 'not done'
         st.session_state['submitted_once'] = False
-        base64_image = None
-        
-    elif base64_image is None:
+        image_bytes = None
+
+    elif image_bytes is None and st.session_state['photo'] == 'done':
+        st.warning("Please upload or take a picture first.")
         st.session_state['markdown_text'] = None
         st.session_state['submitted_once'] = False
         st.session_state['output'] = None
-    
-    else:
+        st.session_state['photo'] = 'not done'
+
+    elif st.session_state.get('markdown_text'):
         st.markdown(st.session_state['markdown_text'])
-        response = requests.post(url, data={"markdown": st.session_state['markdown_text'], "engine": "pdflatex"})
-        output = response.content
-        if response.status_code != 200:
-            response = requests.post(url, data={"markdown": st.session_state['markdown_text'], "engine": "wkhtmltopdf", "css": css})
-            output = response.content
-        st.download_button(
-            label="Download",
-            data=output,
-            file_name="output.pdf",
-            mime="application/pdf",
-        )
+        if st.session_state.get('output'):
+             st.download_button(
+                label="Download PDF Again",
+                data=st.session_state['output'],
+                file_name="output.pdf",
+                mime="application/pdf",
+            )
         st.markdown(footer, unsafe_allow_html=True)
+    else:
+        st.session_state['markdown_text'] = None
         st.session_state['submitted_once'] = False
-        
+        st.session_state['output'] = None
+
